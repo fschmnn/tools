@@ -1,3 +1,7 @@
+""" 
+Adjust the bar_format for the tqdm progress bar
+"""
+
 import tqdm
 
 def pbar(iterable,

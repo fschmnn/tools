@@ -1,0 +1,137 @@
+# ===================================================================== 
+#           Matplotlib style sheet for Figures in Journal
+#
+# a full list of parameters can be found here
+# https://matplotlib.org/stable/users/explain/customizing.html
+#
+# usetex is False. Maybe backend='pgf' improves the result
+#
+#                                                (C) Fabian Scheuermann
+# =====================================================================
+
+# --------------------------------------------------------------------- 
+# font 
+# ---------------------------------------------------------------------
+
+# There are more options when using when rendering the file with LaTeX
+# text.usetex : True. However this increases the filesize and makes 
+# things slower. Therefore we use a similar font that is available on 
+# Windows (Palatino Linotype). 
+
+font.family:     serif
+font.serif:      Palatino Linotype, Garamond, Computer Modern Roman, DejaVu Serif, serif
+font.sans-serif: Helvetica, Verdana, Computer Modern Sans Serif, DejaVu Sans, sans-serif
+font.monospace:  DejaVu Sans Mono, Courier New, monospace
+
+font.size :        10
+
+# make sure we use the same font in math mode
+mathtext.fontset : custom
+mathtext.bf:  serif:bold
+mathtext.bfit: serif:italic:bold
+mathtext.cal: cursive
+mathtext.it:  serif:italic
+mathtext.rm:  serif:italic
+mathtext.sf:  serif:italic
+mathtext.tt:  monospace
+
+figure.titlesize : medium
+axes.titlesize :   medium
+axes.labelsize :   small 
+xtick.labelsize :  x-small
+ytick.labelsize :  x-small
+
+text.color :       black
+axes.labelcolor :  black  
+
+# --------------------------------------------------------------------- 
+# figsize 
+# ---------------------------------------------------------------------
+
+# to obtain the correct figuresize use width_pt = \the\textwidth in your 
+# LaTeX document. Then calculate 
+# width_in = width_pt / 72.27  and optional
+# hight_in = width_in / 1.618  (use the golden ratio)
+
+#figure.figsize : 3.32, 2.05   # from the MNRAS
+figure.figsize : 5.381, 3.326  # from the thesis
+figure.dpi : 300
+
+# --------------------------------------------------------------------- 
+# color of the plot area
+# ---------------------------------------------------------------------
+
+figure.facecolor :  white  # color around the plot area
+figure.edgecolor :  white
+axes.facecolor :    white  # color of the plot area
+axes.edgecolor :    black  
+
+savefig.facecolor : white
+savefig.edgecolor : white
+savefig.bbox :      tight
+
+# --------------------------------------------------------------------- 
+# colorcycle of the lines and width
+# ---------------------------------------------------------------------
+
+# based on https://www.tableau.com/blog/colors-upgrade-tableau-10-56782
+axes.prop_cycle: cycler('color',['e15759','4e79a7','f28e2b','76b7b2','59a14e','edc949','b07aa2','ff9da7','9c755f','bab0ac'])
+
+# --------------------------------------------------------------------- 
+# lines and markers
+# ---------------------------------------------------------------------
+
+lines.linewidth :  1.0
+lines.markersize : 5
+scatter.marker :   o
+
+# --------------------------------------------------------------------- 
+# axes and ticks
+# ---------------------------------------------------------------------
+
+axes.linewidth : 0.6
+axes.grid :      False
+axes.axisbelow : True      
+
+xtick.top :           True
+xtick.color :         black  
+xtick.direction :     in
+xtick.minor.visible : False
+xtick.major.size :    3
+xtick.major.width :   0.6
+xtick.minor.size :    2
+xtick.minor.width :   0.3
+
+ytick.right :         True
+ytick.color :         black
+ytick.direction :     in
+ytick.minor.visible : False
+ytick.major.size :    3
+ytick.major.width :   0.6
+ytick.minor.size :    2
+ytick.minor.width :   0.3
+
+# --------------------------------------------------------------------- 
+# grid
+# ---------------------------------------------------------------------
+
+grid.linewidth : 0.5
+grid.color :     C8C8C8  
+
+# --------------------------------------------------------------------- 
+# legend
+# ---------------------------------------------------------------------
+
+legend.frameon :        True
+legend.fontsize :       x-small
+legend.facecolor :      inherit
+legend.framealpha :     1
+legend.edgecolor :      DDDDDD
+legend.fancybox :       False
+legend.borderpad :      0.3  ## border whitespace
+legend.labelspacing :   0.4  ## the vertical space between the legend entries
+legend.handlelength :   1.0  ## the length of the legend lines
+legend.handleheight :   0.5  ## the height of the legend handle
+legend.handletextpad :  0.4  ## the space between the legend line and legend text
+#legend.borderaxespad : 0.5  ## the border between the axes and legend edge
+#legend.columnspacing : 2.0  ## column separation

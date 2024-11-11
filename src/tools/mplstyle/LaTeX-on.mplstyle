@@ -1,0 +1,25 @@
+# ===================================================================== 
+#           Use LaTeX to render the Figures
+#
+# https://matplotlib.org/stable/users/explain/text/pgf.html
+#
+#    # to activate use
+#    import matplotlib as mpl
+#    mpl.use('pgf')
+#    # or better explicitly in the savefig method
+#    plt.savefig('figure.pdf', backend='pgf')
+#
+# WARNING: this does currently not work
+#
+# ===================================================================== 
+
+# render the file in LaTeX
+pgf.texsystem :       pdflatex   
+pgf.preamble :        \usepackage{amsmath}, \usepackage{hyperref}
+text.latex.preamble : \usepackage{amsmath}, \usepackage{hyperref}
+text.usetex :         True
+
+# blank entrie inherit fonts from document
+font.serif:      []    
+font.sans-serif: []
+font.monospace:  []
