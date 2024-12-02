@@ -1,2 +1,5 @@
-reports
 __pycache__
+data
+ReadMe_files
+ReadMe.ipynb
+tools.ipynb

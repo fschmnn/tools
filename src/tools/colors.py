@@ -4,12 +4,12 @@ This module contains functions and classes to handle colors.
 When working with colors and looking for a method to describe them, 
 color theory offers a multitude of formats, that are often suited for a 
 specific topic (https://en.wikipedia.org/wiki/Color_theory). Many Python
-packages like `colorsys` or `matplotlib` already provide collections of
-useful functions. However, none of them contains all aspects that are 
-relevant to me. Furthermore, there are small differences in how the 
-different formats are processed. For example some store RGB in three 
-channels with 8 bits [0,255] while others use floats in the range [0,1] 
-and the same is true for other formats like HSV or HSL. 
+packages like `colorsys`, `colorspacious` or `matplotlib` already 
+provide collections of useful functions. However, none of them contains 
+all aspects that are relevant to me. Furthermore, there are small 
+differences in how the different formats are processed. For example some 
+store RGB in three channels with 8 bits [0,255] while others use floats 
+in the range [0,1] and the same is true for other formats like HSV or HSL. 
 
 This package combines a collection of existing functions with useful 
 additions for me and makes sure they all use the same format.
@@ -18,10 +18,15 @@ additions for me and makes sure they all use the same format.
 import colorsys
 import re
 
-__all__ = ['CNAMES','nameColor','hexColor','hsvColor','hslColor',
-           'cmykColor','rgbColor','to_color','ColorPalette',
-           'complementary','analogous','triadic','tetradic','square',
-           'hsv_gradient','rgb_gradient']
+# only used in `from_matplotlib` to convert colormap to `ColorPalette`
+import matplotlib 
+# only used in `from_matplotlib` and the `ColorMap` classes
+import numpy 
+
+__all__ = ['CNAMES','cmykColor','hexColor','hsvColor','hslColor',
+           'nameColor','rgbColor','to_color',
+           'hue_shift','hsv_gradient','rgb_gradient','ColorPalette',
+           'ContinuousColorMap','DiscreteColorMap']
 
 # the following dictionary is based on mpl.colors.BASE_COLORS | mpl.colors.TABLEAU_COLORS | mpl.colors.CSS4_COLORS
 # the 166 entries contain only 152 as some keys like `fuchsia` or `magenta` 
@@ -45,28 +50,63 @@ class templateColor:
     `_repr_html_` and should be updated in the subclass.
     """
     format = 'not specified'
+    # Properties
     @property
     def rgb(self):
         return (255,255,255)
+    # once the rgb method is updated, we can simply convert the subclass
+    # to rgb and form there convert to the desired format
+    @property
+    def grey(self):
+        return self.rgb.grey
+    @property
+    def name(self):
+        """Assign a name based on the nearest colors in CNAMES"""
+        return self.rgb.name
+    @property
+    def hex(self):
+        """Return 6 digit hexadecimal representation."""
+        return self.rgb.hex
+    @property
+    def cmyk(self):
+        """Return cyan, magenta, yellow and key representation."""
+        return self.rgb.cmyk
+    @property
+    def hsl(self):
+        """Return hue, saturation, lightness representation"""
+        return self.rgb.hsl
+    @property
+    def hsv(self):
+        """Return hue, saturation, value representation"""
+        return self.rgb.hsv
+    
     
     def __repr__(self):
         return 'please update `__repr__`'
     
     def __eq__(self,other):
-        """Compare the RGB value of two colors"""
+        """Compare the RGB values (rounded to int) of two colors
+        
+        Warnings
+        --------
+        For this comparison, each color is converted to RGB and the 
+        values are rounded to `int`. Therefore, slightly differing 
+        colors might still appear as equal!
+        """
         if not isinstance(other,templateColor):
             return False
         else:
-            return self.rgb[:] == other.rgb[:]
+            return tuple(map(round,self.rgb[:])) == tuple(map(round,other.rgb[:]))
 
     def _repr_html_(self):
-        r,g,b = self.rgb
+        rgb = self.rgb
+        r,g,b = rgb
         if 0.2989*r + 0.5870*g + 0.1140*b > 128:
             font_color = 'black'
         else:
             font_color = 'white'
         
-        return (
+        svg = (
             '<svg width="162" height="100" xmlns="http://www.w3.org/2000/svg">' 
             '<rect width="162" height="100" x="0" y="0" rx="16" ry="16"'
             f'fill="rgb({r},{g},{b})"/>'
@@ -74,6 +114,13 @@ class templateColor:
             f'fill="{font_color}" font-size="12">{self}</text>'
             '</svg>' 
         )   
+        
+        # this only works for rgbColor that has all those objects
+        desc = f'{rgb.name}\n{rgb.hex}\n{rgb}\n{rgb.hsv}\n{rgb.cmyk}'
+
+        html = f'<div><span title="{desc}">{svg}</span></div>'
+
+        return html
         
 
 class nameColor(templateColor,str):
@@ -95,7 +142,8 @@ class nameColor(templateColor,str):
         # the list of colors contains hex values
         hex = CNAMES[self.lower()]
         return rgbColor(int(hex.lstrip('#')[i:i+2],16) for i in [0,2,4])
-    
+    def __repr__(self):
+        return f'{self}'  
     
 class hexColor(templateColor,str):
     format = 'hex'
@@ -107,9 +155,12 @@ class hexColor(templateColor,str):
             A hexadecimal number like #000000 that is 6 (or 8) digits in
             length and optionally starts with `#`.
         """
-        if re.match(r'^#?([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$',hex):
-            if not hex.startswith('#'):
-                hex = '#' + hex
+        if re.match(r'^#?([0-9a-fA-F]{3})$',hex):
+            hex = '#'+''.join(f'{s}{s}' for s in hex.strip('#'))
+            return super().__new__(cls,hex)
+        elif re.match(r'^#?([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$',hex):
+            # if present, the alpha channel will be removed here
+            hex = '#'+hex.strip('#')[:6]
             return super().__new__(cls,hex)
         else:
             raise ValueError(f'`{hex}` is no valid hex color')
@@ -117,7 +168,8 @@ class hexColor(templateColor,str):
     def rgb(self):
         """Get an object with the corresponding RGB values."""
         return rgbColor(int(self.lstrip('#')[i:i+2],16) for i in [0,2,4])
-   
+    def __repr__(self):
+        return f'{self}'  
    
 class cmykColor(templateColor,tuple):
     format = 'cmyk'
@@ -296,7 +348,13 @@ class rgbColor(templateColor,tuple):
     
 
 def to_color(*args,**kwargs):
-    """Identify the format of the input and convert it to RGB.
+    """Identify the format of the input and return a color class.
+    
+    It quickly becomes annoying to always remember to pass the different 
+    formats to the appropriate class. This function provides a factory 
+    function that takes care of this and tries to identify the correct 
+    format. If a suitable format is found, the input is passed on and an 
+    instance of the corresponding class is returned.
     
     Parameters
     ----------
@@ -307,15 +365,17 @@ def to_color(*args,**kwargs):
         
     Returns 
     -------
-    rgbColor
+    cmykColor or hexColor or hslColor or hsvColor or nameColor or rgbColor
     """
+    FORMATS = ['rgb','rgba','hex','hsv','hsb','hls','hsl','cmyk','cmyb']
     
+    # if the input is already a color class we return it
     if args and isinstance(args[0],templateColor):
         return args[0]
     else:
-        # if specified in kwargs, the first one is used
+        # if kwargs are specified, the first one is used
         for k,v in kwargs.items():
-            if k.lower() in ['rgb','rgba','hex','hsv','hsb','hls','hsl','cmyk','cmyb']:
+            if k.lower() in FORMATS:
                 format, value = k.lower(), v
                 break
         else:
@@ -330,70 +390,132 @@ def to_color(*args,**kwargs):
                 format, value = 'hsv', (kwargs['h'],kwargs['s'],kwargs['v'])             
             # if we find no match, we continue our search in args
             else:
-                # if three args are passed we assume they are (r,g,b)
-                if len(args)==3:
-                    format, value = 'rgb', 
-                # otherwise we only check the first arg
-                elif len(args)==1:
+                # we start by checking the first argument
+                if len(args)==1:
                     arg = args[0]
-                    # there are strings with len 3 so we also need to check the instance
-                    if isinstance(arg,(tuple,list)) and (len(arg) == 3):
-                        format, value = 'rgb', arg
-                    elif isinstance(arg,str):
+                    if isinstance(arg,str):
                         # if it is contained in CNAMES, we assign the corresponding color
                         if arg.lower() in CNAMES:
-                            format, value = 'name', arg.lower()
-                        # optional start with # followed by 6 characters
-                        elif re.match(r'^#?([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$',arg):
+                            format, value = 'name', arg.lower()                        
+                        # optional start with # followed by 3, 6 or 8 characters
+                        elif re.match(r'^#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$',arg):
                             format, value = 'hex', arg.lower()
+                        # we check for tuples in a string like 'rgb(255,128,0)'
+                        else:
+                            for k in FORMATS:
+                                if arg.lower().startswith(k):
+                                    # we remove special characters, space and the name of the format
+                                    cleaned_string = re.sub(r"[#°% ()]"+f"|[{k}]", "", arg)
+                                    # then we match the numbers between brackets, separated by ,
+                                    #match = re.match(r"\(?([\d,]+)\)?", cleaned_string)
+                                    try:
+                                        v = tuple(map(int,cleaned_string.split(',')))
+                                    except:
+                                        v = tuple(map(float,cleaned_string.split(',')))
+                                    format, value = k, v
+                    # there are strings with len 3 so we also need to check the instance
+                    elif isinstance(arg,(tuple,list)) and (len(arg) == 3):
+                        format, value = 'rgb', arg
+                # if three args are passed we assume they are (r,g,b)
+                elif len(args)==3:
+                    format, value = 'rgb', args
+
         if 'format' not in locals():
             raise ValueError(f'unknown format: args={args}, kwargs={kwargs}')
         
-        # 2nd step: create appropriate class and convert to rgb
+        # 2nd step: pass the input to the appropriate class
         if (format=='rgb') or (format=='rgba'):
-            return rgbColor(value[:3]).rgb
+            return rgbColor(value[:3])
         elif format == 'name':
-            return nameColor(value).rgb
+            return nameColor(value)
         elif format == 'hex':
-            return hexColor(value).rgb
+            return hexColor(value)
         elif (format == 'cmyk') or (format == 'cmyb'):
-            return cmykColor(value).rgb
+            return cmykColor(value)
         elif (format == 'hsv') or (format == 'hsb'):
-            return hsvColor(value).rgb
+            return hsvColor(value)
         elif (format == 'hsl'):
-            return hslColor(value).rgb
+            return hslColor(value)
         elif (format == 'hls'):
-            return hslColor((value[0],value[2],value[1])).rgb
+            return hslColor((value[0],value[2],value[1]))
         else:
             raise ValueError(f'unexpected error for {format}: {value}')
             
 # ---------------------------------------------------------------------
-# Palette of colors and colormaps
+# Palette of colors
 # ---------------------------------------------------------------------
-    
 # https://www.colorsexplained.com/color-theory/
 
-def complementary(color):
-    r,g,b = color.rgb
-    return to_color((255-r,255-g,255-b))
-
-def analogous(color):
+def hue_shift(color,dhue):
+    """
+    Parameters
+    ----------
+    color : templateColor
+        An instance of a subclass of `templateColor`.
+    dhue : list of int or float
+        List of colors where hue is shifted by dhue (in degree).
+    
+    Returns
+    -------
+    list of rgbColor
+        A list of colors with hue shifted by dhue and converted to RGB.
+    """
     h,s,v = color.hsv
-    # this should be updated to ColorPalette
-    return [to_color(hsv=(hue,s,v)) for hue in [(h-30)%360,h,(h+30)%360]]
+    return [to_color(hsv=((h-hue)%360,s,v)).rgb for hue in dhue]
 
-def triadic(color):
-    h,s,v = color.hsv
-    # this should be updated to ColorPalette
-    return [to_color(hsv=(hue,s,v)) for hue in [h,(h+120)%360,(h+240)%360]]
 
-def tetradic(color):
-    pass 
+def rgb_gradient(color1,color2,steps=16):
+    """
+    Parameters
+    ----------
+    color1, color2 : templateColor
+        Instances of a subclass of `templateColor`.
+    steps : int
+        Number of colors in the output.
+        
+    Returns 
+    -------
+    list of rgbColor
+        A list of colors that shifts from the first to the second in 
+        RGB space.
+    """
+    
+    r1,g1,b1 = color1.rgb
+    r2,g2,b2 = color2.rgb
+    dr,dg,db = (r2-r1)/(steps-1), (g2-g1)/(steps-1), (b2-b1)/(steps-1)
+    return [to_color(rgb=(r1+i*dr,g1+i*dg,b1+i*db)) for i in range(steps)]
 
-def square(color):
-    h,s,v = color.hsv
-    # this should be updated to ColorPalette
-    return [to_color(hsv=(hue,s,v)) for hue in [h,(h+90)%360,(h+180)%360,(h+270)%360]]
+
+def hsv_gradient(color1,color2,steps=16,direction='short'):
+    """
+    Parameters
+    ----------
+    color1, color2 : templateColor
+        Instances of a subclass of `templateColor`.
+    steps : int
+        Number of colors in the output.
+    direction : {'short','long'}
+        Determines if the short or long angular distance around the 
+        color wheel is used.
+        
+    Returns 
+    -------
+    list of rgbColor
+        A list of colors from the first to the second in HSV space.
+    """
+    
+    h1,s1,v1 = color1.hsv
+    h2,s2,v2 = color2.hsv
+    # for the short angle we make sure it is within [-180°,180°]
+    dh_short = (h2-h1+180)%360 - 180
+    # the long angle is the complement of the short one
+    dh_long  = dh_short - dh_short/abs(dh_short)*360
+    if direction=='short':
+        dh = dh_short/(steps-1)
+    else:
+        dh = dh_long/(steps-1)
+    ds,dv =  (s2-s1)/(steps-1),  (v2-v1)/(steps-1)
+    return [to_color(hsv=((h1+i*dh)%360,s1+i*ds,v1+i*dv)).rgb for i in range(steps)]
 
 
 class ColorPalette(list):
@@ -402,14 +524,18 @@ class ColorPalette(list):
     Constructors
     ------------
     __init__()
-    complementary()
     analogous() 
+    complementary()
+    split_complementary()
     triadic()
+    tetradic()
     square()
     
     Methods
     -------
     to_hex()
+    to_DiscreteColorMap()
+    to_ContinuousColorMap()
     shift()
     
     Operators
@@ -417,35 +543,107 @@ class ColorPalette(list):
     __add__, __iadd__, __radd__, __getitem__, _repr_html_
     """
     
+    @staticmethod     
+    def analogous(color):
+        """Shift hue of color by [-30°,0°,+30°]"""
+        return ColorPalette(hue_shift(to_color(color),[-30,0,30]))
+    
     # Constructors
     @staticmethod
     def complementary(color):
-        return ColorPalette([to_color(color),complementary(to_color(color))])
-    
-    @staticmethod     
-    def analogous(color):
-        return ColorPalette(analogous(color))
+        """Shift hue of color by [0°,180°]"""
+        return ColorPalette(hue_shift(to_color(color),[0,180]))
+
+    @staticmethod
+    def split_complementary(color):
+        """Shift hue of color by [0°,150°,210°]"""
+        return ColorPalette(hue_shift(to_color(color),[0,150,210]))
 
     @staticmethod     
     def triadic(color):
-        return ColorPalette(triadic(color))
+        """Shift hue of color by [0°,120°,240°]"""
+        return ColorPalette(hue_shift(to_color(color),[0,120,240]))
     
     @staticmethod     
+    def tetradic(color):
+        """Shift hue of color by [0°,-30°,180°,120°]"""
+        return ColorPalette(hue_shift(to_color(color),[0,-30,180,120]))
+   
+    @staticmethod     
     def square(color):
-        return ColorPalette(square(color))
+        """Shift hue of color by [0°,90°,180°,270°]"""
+        return ColorPalette(hue_shift(to_color(color),[0,90,180,270]))
+    
+    @staticmethod     
+    def hsv_gradient(color1,color2,steps=16,direction='short'):
+        return ColorPalette(hsv_gradient(color1,color2,steps=steps,direction=direction))
+    
+    @staticmethod     
+    def rgb_gradient(color1,color2,steps=16):
+        return ColorPalette(rgb_gradient(color1,color2,steps=steps))
+        
+    @staticmethod     
+    def from_matplotlib(name,N=None):
+        """Convert a Matplotlib colormap to a ColorPalette
+        
+        Parameters
+        ----------
+        name : str
+            Name of a colormap known to Matplotlib.
+        N : int, optional
+            Number of RGB levels. If `None`, the original value is kept. 
+        """
+        cmap = matplotlib.colormaps[name]
+        if not N:
+            N = cmap.N
+        values = numpy.linspace(0,cmap.N,N,dtype=int)
+        # we use bytes=True to get RGB values in the range [0,255]
+        return ColorPalette([to_color(rgba=cmap(value,bytes=True)) for value in values])
     
     # Methods
     def to_hex(self,inplace=False):
-        """Convert all entries to hex"""
+        """Convert all items to `hexColor`.
+        
+        ColorPalette is just a list of colors and can contain colors in
+        different formats. This method attempts to convert them all to
+        hex so that they can be used in other functions.
+        """
         if inplace:
             for i, color in enumerate(self):
-                self[i] = to_color(color).rgb.hex
+                self[i] = to_color(color).hex
         else:
-            return ColorPalette([to_color(color).rgb.hex for color in self])
+            return ColorPalette([to_color(color).hex for color in self])
+    
+    def to_DiscreteColorMap(self):
+        """Pass the items to `matplotlib.colors.ListedColormap` to 
+        create a discrete colormap.
+        """
+        cmap = matplotlib.colors.ListedColormap(
+            name='discrete',
+            colors=[str(color) for color in self.to_hex()]
+            )
+        return cmap 
+    
+    def to_ContinuousColorMap(self,N=256):
+        """Pass the items to `matplotlib.colors.LinearSegmentedColormap` 
+        to create a continuous colormap.
+        
+        Parameters
+        ----------
+        N : int
+            Number of RGB levels in the coloramp.
+        """
+        cmap = matplotlib.colors.LinearSegmentedColormap.from_list(
+            name='continuous',
+            colors=[str(color) for color in self.to_hex()],
+            N=N
+            )
+        return cmap 
     
     def shift(self,shift):
         """Shift entries"""
         return ColorPalette(self[shift%len(self):]+self[:shift%len(self)])
+    
     
     # Operators
     def __add__(self, other):
@@ -480,50 +678,100 @@ class ColorPalette(list):
         svg += '</svg>'
         
         return svg 
+   
+# copy to docstring from the functions to the methods of the class
+ColorPalette.hsv_gradient.__doc__ = hsv_gradient.__doc__
+ColorPalette.rgb_gradient.__doc__ = rgb_gradient.__doc__
     
+
+# ---------------------------------------------------------------------
+# Colormaps
+# ---------------------------------------------------------------------
+
+class DiscreteColorMap:
+    """This is a discrete colormap and the nearest value is chosen.
     
-def rgb_gradient(color1,color2,N=16):
-    """Compute a list of colors between color1 and color2 in RGB space.
-    
-    Parameters
-    ----------
-    color1 and color2 : 
-        A valid input to `Color`.
-    N : int
-        Number of colors in the output.
-        
-    Returns 
-    -------
-    ColorPalette
+    For working projects, it is recommendable to utilize the class
+    `matplotlib.colors.ListedColormap` instead.
     """
     
-    r1,g1,b1 = to_color(color1).rgb
-    r2,g2,b2 = to_color(color2).rgb
-    dr,dg,db = (r2-r1)/(N-1),  (g2-g1)/(N-1),  (b2-b1)/(N-1)
-    return ColorPalette([to_color((r1+i*dr,g1+i*dg,b1+i*db)) for i in range(N)])
-
-
-def hsv_gradient(color1,color2,N=16,direction='shortest'):
-    """Compute a list of colors between color1 and color2 in HSV space.
-    
-    Parameters
-    ----------
-    color1 and color2 : 
-        A valid input to `Color`.
-    N : int
-        Number of colors in the output.
+    def __init__(self,colors,limits=(0,1)):
+        """ 
+        Parameters
+        ----------
+        colors : list of colors or ColorPalette
+        limits : tuple
+            The range of the data that is later passed in `__call__`.
+        """
+        # we prepare the data points for the interpolation
+        self.rgbp = numpy.array([numpy.array(color.rgb)/255 for color in colors])
+        self.tp = numpy.linspace(0,1,len(colors))
+        self.limits = limits
         
-    Returns 
-    -------
-    ColorPalette
+    def __call__(self,arr):    
+        """ 
+        Parameters
+        ----------
+            arr : int or float or ndarray
+        Returns
+        -------
+        rgb_arr : ndarry 
+            RGB array with shape `arr.shape+(3,)` in range [0,255].
+        """
+        # we clip the values of the array to the limits
+        clipped_arr = numpy.minimum(self.limits[1],numpy.maximum(self.limits[0],arr))
+        # we scale those values to [0,1]
+        scaled_arr = (clipped_arr - self.limits[0]) / (self.limits[1]-self.limits[0])
+        # we first add a new axis to the array to subtract tp. Then we
+        # determine the minimum of the absolute value along this new 
+        # axis. This gives us the index to get the color rgbp.
+        index_arr = numpy.abs(scaled_arr[...,numpy.newaxis]-self.tp).argmin(axis=-1)
+        rgb_arr = self.rgbp[index_arr]
+        return rgb_arr
+
+
+class ContinuousColorMap:
+    """This is a continuous colormap and values are interpolated.
+
+    
+    For working projects, it is recommendable to utilize the class
+    `matplotlib.colors.LinearSegmentedColormap` instead.
     """
     
-    h1,s1,v1 = to_color(color1).rgb.hsv
-    h2,s2,v2 = to_color(color2).rgb.hsv
-    if direction=='shortest':
-        dh = ((h2-h1-180)%360-180)/(N-1)
-    else:
-        dh = (h2-h1)/(N-1)
-    ds,dv =  (s2-s1)/(N-1),  (v2-v1)/(N-1)
-    return ColorPalette([to_color(hsv=((h1+i*dh)%360,s1+i*ds,v1+i*dv)).rgb for i in range(N)])
+    def __init__(self,colors,limits=(0,1)):
+        """ 
+        Parameters
+        ----------
+        colors : list of colors or ColorPalette
+        limits : tuple
+            The range of the data that is later passed in `__call__`.
+        """
+        # we prepare the data points for the interpolation
+        self.rp,self.gp,self.bp = numpy.array([color.rgb for color in colors]).T / 255
+        self.tp = numpy.linspace(0,1,len(colors))
+        self.limits = limits
+        
+    def __call__(self,arr):    
+        """ 
+        Parameters
+        ----------
+            arr : int or float or ndarray
+        Returns
+        -------
+        rgb_arr : ndarry 
+            RGB array with shape `arr.shape+(3,)` in range [0,255].
+        """
+        # we clip the values of the array to the limits
+        clipped_arr = numpy.minimum(self.limits[1],numpy.maximum(self.limits[0],arr))
+        # we scale those values to [0,1]
+        scaled_arr = (clipped_arr - self.limits[0]) / (self.limits[1]-self.limits[0])
+        # we create an empty array and add an axis with 3 layers
+        rgb_arr = numpy.zeros(scaled_arr.shape+(3,))
+        # we fill the layers with entries for r, b and b
+        rgb_arr[...,0] = numpy.interp(scaled_arr,self.tp,self.rp)
+        rgb_arr[...,1] = numpy.interp(scaled_arr,self.tp,self.gp)
+        rgb_arr[...,2] = numpy.interp(scaled_arr,self.tp,self.bp)
+        return rgb_arr
+        
+
 

@@ -3,6 +3,8 @@ import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt 
 from matplotlib import font_manager
+   
+__all__ = ["xkcd"]
     
 # when using xkcd, we need to add some additional fonts
 font_path  = Path(__file__).parent/'xkcd-fonts'

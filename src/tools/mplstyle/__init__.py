@@ -30,3 +30,16 @@ https://matplotlib.org/stable/users/explain/customizing.html#distributing-styles
 """
 
 from .xkcd import xkcd
+
+# add mplstyles to the the matplotlib library. This is copy-paste from: 
+# https://github.com/garrettj403/SciencePlots/blob/master/scienceplots/__init__.py
+
+from pathlib import Path
+import matplotlib.pyplot as plt
+
+# if this is part of tools.__init__, the folder `mplstyle` needs to be added
+path = Path(__file__).parent 
+stylesheets = plt.style.core.read_style_directory(path)
+
+plt.style.core.update_nested_dict(plt.style.library, stylesheets)
+plt.style.core.available[:] = sorted(plt.style.library.keys())

@@ -13,16 +13,34 @@ import matplotlib.pyplot as plt
 
 from .array import find_contours 
 
-# This should probably not be here, but instead be called by the user
-import locale
-locale.setlocale(locale.LC_TIME, 'de_DE')
 
-__all__ = ["to_date","last_day_of_month","range_of_dates","Date",
-           "DayCalendar","WeekCalendar","MonthCalendar","YearCalendar"]
+__all__ = ["set_location","to_date","last_day_of_month","range_of_dates","Date",
+           "Calendar","WeekCalendar","MonthCalendar","YearCalendar"]
+
+
+def set_location(locale='de_DE',category=5):
+    """ 
+    Parameters
+    ----------
+    category : int, default locale.LC_TIME=5
+        The available categories are: LC_ALL:0, LC_COLLATE: 1, 
+        LC_CTYPE: 2, LC_MONETARY: 3, LC_NUMERIC: 4, LC_TIME: 5
+    locale : str, default 'de_DE'
+    """
+    # This changes the location to my personally most frequently used 
+    # case. To avoid that loading this package automatically changes the 
+    # location, it is moved to this function, so the user still has to
+    # call it.
+
+    from locale import setlocale
+    setlocale(category,locale)
 
 
 def to_date(*date,format=r'%Y-%m-%d'):
     """Convert a variety of formats to datetime.date.
+   
+    This is a factory function that tries to identify the format of the
+    input and returns a suitable `datetime.date` instance.
     
     Parameter
     ---------
@@ -60,7 +78,7 @@ def to_date(*date,format=r'%Y-%m-%d'):
         # this function returns datetime and we convert it to date
         return datetime.datetime.strptime(date,format).date()
     else:
-        raise ValueError(f'unkown dtype/format for {date}')
+        raise ValueError(f'unknown dtype/format for {date}')
 
 
 def last_day_of_month(*date):
@@ -230,7 +248,7 @@ class Date(datetime.date):
         return NotImplemented
     
   
-class DayCalendar:
+class Calendar:
     
     def __init__(self,start_date,end_date,firstweekday=0):
         """ 
@@ -253,9 +271,13 @@ class DayCalendar:
         
         # we create a list of all dates and places to store further input
         # we turn it into a 2d array to utilize generate_image().
-        self.dates = np.array([start_date+datetime.timedelta(days) for days in range(self.ndays)]).reshape(1,-1)
+        self.dates = np.array([self.start_date+datetime.timedelta(days) for days in range(self.ndays)]).reshape(1,-1)
         self.events = dict()
         self.colors = dict()
+       
+    def __contains__(self,date):
+        """Check if a date is between start_date and end_date"""
+        return self.start_date<=to_date(date)<=self.end_date
         
     def add_event(self,date,event=1,format=r'%Y-%m-%d'):    
         """
@@ -276,11 +298,10 @@ class DayCalendar:
         date = to_date(date,format=format)
             
         # we only date of type datetime.date to the dictionary
-        if isinstance(date,datetime.date):
-            if self.start_date<=date<=self.end_date:
-                self.events[date] = event
-            else:
-                warnings.warn(f"{date.strftime(r'%Y-%m-%d')} lies outside.")
+        if date in self:
+            self.events[date] = event
+        else:
+            warnings.warn(f"{date.strftime(r'%Y-%m-%d')} lies outside.")
 
     def update_colors(self,color_dict=None,cmap='Wistia'):
         """ 
@@ -297,13 +318,15 @@ class DayCalendar:
         for date, event in self.events.items():
             self.colors[date] = color_dict.get(event,'#000000')
             
-        
     def generate_image(self):
         """ 
         Turn the colors dictionary into an 3d array that contains two
         spatial dimensions and a third one for the rgb values.
         """
         
+        if len(self.colors) != len(self.events):
+            warnings.warn("Please run `Calendar.update_colors()` to add missing events.")
+            
         # we start by creating a 2d array with the hex values
         hex2d = np.empty(self.dates.shape,dtype='U7')
         for date, hex in self.colors.items():
@@ -336,7 +359,7 @@ class DayCalendar:
         return ''
     
     
-class WeekCalendar(DayCalendar):
+class WeekCalendar(Calendar):
     """ 
     Create a (7xn) grid with all the dates in the given range
     """
@@ -410,7 +433,7 @@ class WeekCalendar(DayCalendar):
         return fig,ax 
     
     
-class MonthCalendar(DayCalendar):
+class MonthCalendar(Calendar):
     
     def __init__(self,year,month,firstweekday=0):
         """  
@@ -547,7 +570,7 @@ class YearCalendar:
 
     def plot(self,grid=False,axis_size=2.36):
 
-        fontdict_year = {'weight':'bold','color':'#1e5d3f'}
+        fontdict_year = {'weight':'bold','color':'#407045'}
         fontdict_month = {'fontsize':10,'color':'white','weight':'bold','va':'center','ha':'center'}
         fontdict_weekday = {'fontsize':8,'color':'white','weight':'bold','va':'center','ha':'center'}
         fontdict_day = {'fontsize':8,'color':'black','va':'center','ha':'center'}
@@ -590,13 +613,13 @@ class YearCalendar:
             ax.add_patch(mpl.patches.Circle((5.5,4.5),1,edgecolor='none',facecolor='white',zorder=1))
             ax.add_patch(mpl.patches.Rectangle((-0.5,4.5),6,1,edgecolor='none',facecolor='white',zorder=1))
             
-            # caption for the Month
-            ax.add_patch(mpl.patches.Circle((0.5,-2.),1,edgecolor='none',facecolor='#1e5d3f',zorder=2))
-            ax.add_patch(mpl.patches.Rectangle((-0.5,-2),1,0.5,edgecolor='none',facecolor='#1e5d3f',zorder=2))
-            ax.add_patch(mpl.patches.Rectangle((0.5,-3),7.5,1.5,edgecolor='none',facecolor='#1e5d3f',zorder=2))
+            # caption for the Month (previously #1e5d3f)
+            ax.add_patch(mpl.patches.Circle((0.5,-2.),1,edgecolor='none',facecolor='#407045',zorder=2))
+            ax.add_patch(mpl.patches.Rectangle((-0.5,-2),1,0.5,edgecolor='none',facecolor='#407045',zorder=2))
+            ax.add_patch(mpl.patches.Rectangle((0.5,-3),7.5,1.5,edgecolor='none',facecolor='#407045',zorder=2))
 
-            # caption for the weekdays
-            ax.add_patch(mpl.patches.Rectangle((-0.5,-1.5),7.5,1,color='#00a770',zorder=3))
+            # caption for the weekdays (previously #00a770)
+            ax.add_patch(mpl.patches.Rectangle((-0.5,-1.5),7.5,1,color='#5c8659',zorder=3))
             
             # we draw the grid by hand
             if grid:
